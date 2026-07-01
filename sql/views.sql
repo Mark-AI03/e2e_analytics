@@ -58,3 +58,24 @@ GROUP BY
     FORMAT(order_date, 'yyyyMM')
 ) ranked
 WHERE rank = 1
+
+
+CREATE VIEW highest_growth_sub_category AS
+SELECT TOP 1 *
+FROM (
+SELECT
+    sub_category,
+    SUM(CASE WHEN order_year = 2022 THEN total_profit ELSE 0 END) AS [profit_2022],
+    SUM(CASE WHEN order_year = 2023 THEN total_profit ELSE 0 END) AS [profit_2023],
+    (SUM(CASE WHEN order_year = 2023 THEN total_profit ELSE 0 END) - SUM(CASE WHEN order_year = 2022 THEN total_profit ELSE 0 END)) / NULLIF(SUM(CASE WHEN order_year = 2022 THEN total_profit ELSE 0 END), 0) * 100 AS [growth_percentage]
+FROM (
+    SELECT
+        sub_category,
+        FORMAT(order_date, 'yyyy') AS [order_year],
+        ROUND(SUM(profit),2) AS [total_profit]
+    FROM df_orders
+    GROUP BY sub_category, FORMAT(order_date, 'yyyy')
+) cte
+GROUP BY sub_category
+) cte2
+ORDER BY growth_percentage DESC

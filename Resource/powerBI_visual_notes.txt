@@ -1,0 +1,41 @@
+## Power BI visuals — build notes
+
+**Visual 1 — Top 10 products (bar chart)**
+- Visual type: Clustered bar chart
+- Data source: `top_10_products`
+- Y-axis: `product_id`
+- X-axis: `total_sales_revenue`
+
+**Visual 2 — Top 5 products per region (matrix)**
+- Visual type: Matrix
+- Data source: `top_5_products_per_region`
+- Rows (in this order): `region`, then `product_id`
+- Values: `total_sales`
+- After building: expand all regions ("Expand all down one level") so all 5 products per region show at once
+
+**Visual 3 — Month over month growth (line chart)**
+- Visual type: Line chart
+- Data source: `month_over_month_growth`
+- X-axis: `order_month`
+- Y-axis: `sales_2022` and `sales_2023` (both added)
+
+**Visual 4 — Best month per category (table)**
+- Visual type: Table
+- Data source: `best_month_per_category`
+- Columns: `category`, `order_month`, `total_sales`
+
+**Visual 5 — Highest growth sub-category (cards)**
+- Visual type: Card (x2)
+- Data source: `highest_growth_sub_category`
+- Card 1 field: `sub_category`
+- Card 2 field: `growth_percentage`
+- Note: add explicit text labels above/near these cards (e.g. "Highest growth sub-category" and "Growth % 2023 vs 2022") since a raw number/name with no label is unclear on its own
+
+**Dashboard title**
+- Text box, top of canvas
+- Title: "Retail Sales & Profitability Overview"
+- Font: bold, large, blue — matches chart title color for consistency
+
+**Logo**
+- Placed under the title
+- Exported as PNG, inserted via Insert → Image
