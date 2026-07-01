@@ -47,26 +47,45 @@
 -- ORDER BY order_month
 
 
-WITH cte AS (
-SELECT
-    category,
-    FORMAT(order_date, 'yyyyMM') AS [order_month],
-    ROUND(SUM(sale_price),2) AS [total_sales]
-FROM df_orders
-GROUP BY
-    category,
-    FORMAT(order_date, 'yyyyMM')
-),
-ranked AS (
-SELECT
-    *,
-    ROW_NUMBER() OVER(
-        PARTITION BY category ORDER BY total_sales DESC
-    ) AS [rank]
-FROM cte
-)
-SELECT *
-FROM ranked
-WHERE rank = 1
+-- WITH cte AS (
+-- SELECT
+--     category,
+--     FORMAT(order_date, 'yyyyMM') AS [order_month],
+--     ROUND(SUM(sale_price),2) AS [total_sales]
+-- FROM df_orders
+-- GROUP BY
+--     category,
+--     FORMAT(order_date, 'yyyyMM')
+-- ),
+-- ranked AS (
+-- SELECT
+--     *,
+--     ROW_NUMBER() OVER(
+--         PARTITION BY category ORDER BY total_sales DESC
+--     ) AS [rank]
+-- FROM cte
+-- )
+-- SELECT *
+-- FROM ranked
+-- WHERE rank = 1
 
 
+-- question 5: which sub-category had the highest growth by profit in 2023 vs 2022.
+SELECT TOP 1 *
+FROM (
+SELECT
+    sub_category,
+    SUM(CASE WHEN order_year = 2022 THEN total_profit ELSE 0 END) AS [profit_2022],
+    SUM(CASE WHEN order_year = 2023 THEN total_profit ELSE 0 END) AS [profit_2023],
+    (SUM(CASE WHEN order_year = 2023 THEN total_profit ELSE 0 END) - SUM(CASE WHEN order_year = 2022 THEN total_profit ELSE 0 END)) / NULLIF(SUM(CASE WHEN order_year = 2022 THEN total_profit ELSE 0 END), 0) * 100 AS [growth_percentage]
+FROM (
+    SELECT
+        sub_category,
+        FORMAT(order_date, 'yyyy') AS [order_year],
+        ROUND(SUM(profit),2) AS [total_profit]
+    FROM df_orders
+    GROUP BY sub_category, FORMAT(order_date, 'yyyy')
+) cte
+GROUP BY sub_category
+) cte2
+ORDER BY growth_percentage DESC
