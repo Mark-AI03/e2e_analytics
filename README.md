@@ -1,48 +1,62 @@
-# E2E Analytics — Retail Orders ETL Pipeline
+# E2E Analytics — Retail Orders Pipeline & Power BI Dashboard
 
-An end-to-end data pipeline that extracts retail order data from Kaggle, applies business transformations, and loads the results into a Microsoft SQL Server database.
+## Introduction
+
+This project is an end-to-end analytics pipeline built around a public retail orders dataset. It starts by pulling raw order data from Kaggle, cleans and enriches it in Python, loads it into a Microsoft SQL Server database, layers business-focused SQL views on top of it, and finally surfaces the results in an interactive Power BI dashboard.
+
+The goal was to reproduce, hands-on, the full path a real analytics team follows: **ingest → transform → store → query → visualize** — using a modern, lightweight local toolchain (Python, VS Code, SQL Server, Power BI).
 
 ---
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        E2E Analytics Pipeline                       │
-└─────────────────────────────────────────────────────────────────────┘
+![Architecture diagram](Resource/Architecture.png)
 
-  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-  │   SOURCE     │     │   EXTRACT    │     │  TRANSFORM   │     │    LOAD      │
-  │              │     │              │     │              │     │              │
-  │  Kaggle API  │────▶│ download_    │────▶│ OrderTrans-  │────▶│ load_to_sql  │
-  │              │     │ data()       │     │ former.run() │     │              │
-  │  retail-     │     │              │     │              │     │  SQL Server  │
-  │  orders.zip  │     │ unzip_file() │     │ - rename     │     │  (testdb)    │
-  │  (~10K rows) │     │              │     │ - clean nulls│     │              │
-  └──────────────┘     │  DATA/       │     │ - discount   │     │  df_orders   │
-                       │  orders.csv  │     │ - sale_price │     │  table       │
-                       └──────────────┘     │ - profit     │     └──────────────┘
-                                            │ - dates      │
-                                            └──────────────┘
+The pipeline has five stages:
 
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │                         Project Structure                           │
-  │                                                                     │
-  │   src/                                                              │
-  │   ├── main.py              ◀── Orchestrates the full pipeline       │
-  │   └── pipeline/                                                     │
-  │       ├── config.py        ◀── Paths & DB connection string         │
-  │       ├── extract.py       ◀── Kaggle download + unzip              │
-  │       ├── transform.py     ◀── Pandas cleaning & enrichment         │
-  │       └── load.py          ◀── SQLAlchemy → SQL Server              │
-  │                                                                     │
-  │   DATA/                                                             │
-  │   └── orders.csv           ◀── Raw data (auto-downloaded)           │
-  │                                                                     │
-  │   sql/                                                              │
-  │   └── analysis.sql         ◀── Post-load business queries           │
-  └─────────────────────────────────────────────────────────────────────┘
-```
+1. **Data Source** — Kaggle Datasets API (`ankitbansal06/retail-orders`)
+2. **Ingestion** — Python downloads the dataset via the Kaggle API
+3. **Processing** — Python + pandas clean and enrich the raw data
+4. **Storage** — the processed data is loaded into SQL Server
+5. **Analysis & Visualization** — SQL views feed a Power BI dashboard
+
+All development was done in **VS Code**, using the **MSSQL extension** to create tables, write/run/test SQL queries, and manage the database directly from the editor.
+
+---
+
+## Dashboard
+
+![Power BI dashboard](Resource/Dashboard.png)
+
+The dashboard, **"Retail Sales & Profitability Overview,"** answers five business questions directly from SQL views (no DAX modeling required):
+
+| Visual | Question it answers | Source view |
+|---|---|---|
+| Bar chart | Which products generate the most revenue? | `top_10_products` |
+| Matrix | What are the top 5 products in each region? | `top_5_products_per_region` |
+| Line chart | How do 2022 and 2023 sales compare month over month? | `month_over_month_growth` |
+| Table | Which month was best for each category? | `best_month_per_category` |
+| Cards | Which sub-category grew the most (profit, 2023 vs 2022)? | `highest_growth_sub_category` |
+
+Build details for each visual are documented in [Resource/powerBI_visual_notes.txt](Resource/powerBI_visual_notes.txt), and the editable dashboard file is [Resource/PowerBI Dashboard.pbix](Resource/PowerBI%20Dashboard.pbix).
+
+---
+
+## What We Did
+
+1. **Extract** ([src/pipeline/extract.py](src/pipeline/extract.py)) — downloaded `retail-orders.zip` from Kaggle and unzipped it into `DATA/orders.csv`.
+2. **Transform** ([src/pipeline/transform.py](src/pipeline/transform.py)) — using an `OrderTransformer` chain:
+   - Standardized column names (lowercase, underscores)
+   - Cleaned invalid `ship_mode` values (`"Not Available"`, `"unknown"` → null)
+   - Computed `discount` = `list_price × discount_percent / 100`
+   - Computed `sale_price` = `list_price - discount`
+   - Computed `profit` = `sale_price - cost_price`
+   - Parsed `order_date` into a proper date type
+   - Dropped the now-redundant source pricing columns
+3. **Load** ([src/pipeline/load.py](src/pipeline/load.py)) — wrote the cleaned DataFrame into the `df_orders` table in SQL Server via SQLAlchemy.
+4. **Analyze** ([sql/analysis.sql](sql/analysis.sql)) — wrote ad-hoc SQL to answer five business questions (top products, regional leaders, YoY trends, best month per category, highest-growth sub-category).
+5. **Views** ([sql/views.sql](sql/views.sql)) — converted each analysis query into a reusable SQL `VIEW` so Power BI could connect directly without embedding logic in the report.
+6. **Visualize** — connected Power BI to SQL Server, built one visual per view, and assembled them into a single dashboard.
 
 ---
 
@@ -56,77 +70,78 @@ An end-to-end data pipeline that extracts retail order data from Kaggle, applies
 | DB Connector | SQLAlchemy + pyodbc (ODBC Driver 17) |
 | Data Source | Kaggle API |
 | Package Manager | uv |
+| Editor / DB tooling | VS Code + MSSQL extension |
+| Visualization | Power BI Desktop |
 
 ---
 
-## Prerequisites
+## Step-by-Step Guide: Reproduce This From Scratch
 
-- Python 3.13
-- [uv](https://docs.astral.sh/uv/) package manager
-- Microsoft SQL Server (local instance)
-- ODBC Driver 17 for SQL Server
-- Kaggle account with API credentials
+### 1. Prepare your environment
 
----
+- Install **Python 3.13**
+- Install **[uv](https://docs.astral.sh/uv/)** (Python package manager)
+- Install **Microsoft SQL Server** (Developer or Express edition works locally)
+- Install the **ODBC Driver 17 for SQL Server**
+- Install **VS Code**, then add the **MSSQL extension** (`ms-mssql.mssql`)
+- Install **Power BI Desktop**
+- Create a free **Kaggle account**
 
-## Reproducible Setup Steps
+### 2. Get Kaggle API credentials
 
-### 1. Clone the repository
+1. Go to [kaggle.com](https://www.kaggle.com) → your profile → **Account** → **Create New Token**
+2. This downloads a `kaggle.json` file
+3. Place it at:
+   - Windows: `C:\Users\<YourUser>\.kaggle\kaggle.json`
+   - Mac/Linux: `~/.kaggle/kaggle.json`
+
+### 3. Clone the repository
 
 ```bash
 git clone https://github.com/Mark-AI03/e2e_analytics.git
 cd e2e_analytics
 ```
 
-### 2. Set up Kaggle API credentials
-
-1. Go to [kaggle.com](https://www.kaggle.com) → Account → **Create New Token**
-2. Download `kaggle.json`
-3. Place it at:
-   - Windows: `C:\Users\<YourUser>\.kaggle\kaggle.json`
-   - Mac/Linux: `~/.kaggle/kaggle.json`
-
-### 3. Install dependencies
+### 4. Install Python dependencies
 
 ```bash
 uv sync
 ```
 
-### 4. Configure the database connection
+### 5. Set up the database
 
-Open `src/pipeline/config.py` and update the connection string to match your SQL Server instance:
+1. In VS Code, connect to your local SQL Server instance using the MSSQL extension
+2. Create a database named `testdb`
+3. Open [src/pipeline/config.py](src/pipeline/config.py) and update the connection string if your server name differs:
+   ```python
+   DB_CONNECTION_STRING = 'mssql://<SERVER_NAME>/testdb?driver=ODBC+DRIVER+17+FOR+SQL+SERVER'
+   ```
 
-```python
-DB_URL = "mssql://<SERVER_NAME>/testdb?driver=ODBC+DRIVER+17+FOR+SQL+SERVER"
-```
-
-Make sure the `testdb` database exists on your SQL Server instance.
-
-### 5. Run the pipeline
+### 6. Run the pipeline
 
 ```bash
 uv run python src/main.py
 ```
 
-This will:
-1. Download `retail-orders.zip` from Kaggle into `DATA/`
-2. Extract `orders.csv`
-3. Apply all transformations (clean nulls, compute discount, sale price, profit)
-4. Load the result into the `df_orders` table in SQL Server
+This downloads the dataset from Kaggle, transforms it, and loads it into the `df_orders` table in SQL Server.
 
----
+### 7. Run the analysis queries and create views
 
-## Transformations Applied
+1. Open [sql/analysis.sql](sql/analysis.sql) in VS Code (MSSQL extension) to explore the business questions
+2. Run [sql/views.sql](sql/views.sql) against `testdb` to create the five views:
+   - `top_10_products`
+   - `top_5_products_per_region`
+   - `month_over_month_growth`
+   - `best_month_per_category`
+   - `highest_growth_sub_category`
 
-| Step | Description |
-|---|---|
-| Rename columns | Spaces → underscores, all lowercase |
-| Clean nulls | `"Not Available"` and `"unknown"` → `NaN` in `ship_mode` |
-| Discount | `list_price × discount_percent / 100` |
-| Sale price | `list_price - discount` |
-| Profit | `sale_price - cost_price` |
-| Date parsing | `order_date` converted to `datetime` |
-| Drop columns | Remove `list_price`, `cost_price`, `discount_percent` |
+### 8. Build the Power BI dashboard
+
+1. Open Power BI Desktop → **Get Data** → **SQL Server**
+2. Connect to your local server and `testdb` database
+3. Import the five views listed above
+4. Follow [Resource/powerBI_visual_notes.txt](Resource/powerBI_visual_notes.txt) to build each visual (bar chart, matrix, line chart, table, cards)
+5. Or simply open [Resource/PowerBI Dashboard.pbix](Resource/PowerBI%20Dashboard.pbix) directly and point it at your local database
 
 ---
 
